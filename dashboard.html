@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bug Bounty Recon Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      background: #0a0e1a;
+      color: #c9d1d9;
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      background: linear-gradient(135deg, #0d1117 0%, #161b22 100%);
+      border-bottom: 1px solid #21262d;
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .header h1 { font-size: 1.4rem; color: #39d353; letter-spacing: 2px; text-transform: uppercase; }
+    .header h1 span { color: #58a6ff; }
+    .header .sub { font-size: 0.72rem; color: #6e7681; margin-top: 3px; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+
+    /* ── BUTTONS ── */
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: 1px solid #30363d;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.82rem;
+      transition: all 0.18s;
+      background: #21262d;
+      color: #c9d1d9;
+    }
+    .btn:hover { background: #30363d; color: #e6edf3; }
+    .btn-green  { background: #238636; border-color: #238636; color: #fff; }
+    .btn-green:hover { background: #2ea043; border-color: #2ea043; }
+    .btn-blue:hover  { border-color: #58a6ff; color: #58a6ff; }
+    .btn-lime:hover  { border-color: #39d353; color: #39d353; }
+    .btn-red:hover   { border-color: #f78166; color: #f78166; }
+
+    /* ── CONTAINER ── */
+    .container { max-width: 1500px; margin: 0 auto; padding: 22px 28px; }
+
+    /* ── LOADER ── */
+    .loader {
+      background: #161b22;
+      border: 2px dashed #30363d;
+      border-radius: 10px;
+      padding: 60px 30px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s;
+      margin-bottom: 24px;
+    }
+    .loader:hover, .loader.drag-over { border-color: #39d353; }
+    .loader .icon { font-size: 3.5rem; margin-bottom: 14px; }
+    .loader h2 { color: #e6edf3; font-size: 1.2rem; margin-bottom: 8px; }
+    .loader p  { color: #6e7681; font-size: 0.85rem; margin-bottom: 20px; }
+    .loader code {
+      background: #0d1117;
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: #79c0ff;
+      font-size: 0.82rem;
+    }
+    #fileInput { display: none; }
+
+    /* ── DASHBOARD ── */
+    .dashboard { display: none; }
+    .dashboard.visible { display: block; }
+
+    /* ── STATS ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .stat-card {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 18px 16px;
+      text-align: center;
+    }
+    .stat-card .num  { font-size: 2rem; font-weight: bold; margin-bottom: 5px; }
+    .stat-card .lbl  { font-size: 0.68rem; color: #6e7681; text-transform: uppercase; letter-spacing: 1px; }
+    .s-total .num  { color: #58a6ff; }
+    .s-live  .num  { color: #39d353; }
+    .s-waf   .num  { color: #f78166; }
+    .s-cdn   .num  { color: #d2a8ff; }
+    .s-ssl   .num  { color: #79c0ff; }
+    .s-tech  .num  { color: #ffa657; }
+
+    /* ── CONTROLS ── */
+    .controls {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .controls input[type="text"],
+    .controls select {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #c9d1d9;
+      padding: 8px 12px;
+      font-family: inherit;
+      font-size: 0.82rem;
+      transition: border-color 0.18s;
+    }
+    .controls input[type="text"] { width: 260px; }
+    .controls input[type="text"]:focus,
+    .controls select:focus { outline: none; border-color: #58a6ff; }
+    .controls select { cursor: pointer; }
+    .spacer { flex: 1; }
+
+    /* ── TABLE WRAPPER ── */
+    .table-wrap {
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .table-meta {
+      padding: 10px 18px;
+      border-bottom: 1px solid #21262d;
+      font-size: 0.78rem;
+      color: #6e7681;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .table-meta .filename { color: #39d353; }
+
+    /* ── TABLE ── */
+    .scroll-x { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.79rem; }
+
+    thead th {
+      background: #0d1117;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-size: 0.68rem;
+      padding: 11px 14px;
+      text-align: left;
+      border-bottom: 1px solid #21262d;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+    }
+    thead th:hover { color: #e6edf3; }
+    thead th.sorted { color: #58a6ff; }
+    .sort-ic { margin-left: 4px; opacity: 0.35; }
+    thead th.sorted .sort-ic { opacity: 1; }
+
+    tbody tr { border-bottom: 1px solid #21262d; transition: background 0.1s; }
+    tbody tr:hover { background: #1c2129; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td {
+      padding: 9px 14px;
+      vertical-align: middle;
+      max-width: 190px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* ── BADGES ── */
+    .host-link { color: #58a6ff; text-decoration: none; font-weight: bold; }
+    .host-link:hover { text-decoration: underline; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: bold;
+    }
+    .b-2xx { background:#0d4429; color:#39d353; border:1px solid #196c2e; }
+    .b-3xx { background:#272115; color:#e3b341; border:1px solid #9e6a03; }
+    .b-4xx { background:#2d0f0d; color:#f78166; border:1px solid #b62324; }
+    .b-5xx { background:#2d1b00; color:#ffa657; border:1px solid #9b4d11; }
+    .b-nil { background:#1c2129; color:#6e7681; border:1px solid #30363d; }
+
+    .waf-badge { background:#2d1b00; color:#ffa657; border:1px solid #9b4d11; }
+    .tech-pill { background:#1a2035; color:#79c0ff; border:1px solid #1a4080; }
+
+    .tech-wrap { display:flex; flex-wrap:wrap; gap:3px; }
+    .tech-more { color:#6e7681; font-size:0.7rem; }
+    .dim { color:#3d444d; }
+    .ip-cell { color:#8b949e; font-size:0.73rem; }
+    .ssl-val { color:#79c0ff; }
+    .cdn-val { color:#d2a8ff; }
+
+    /* ── NO RESULTS ── */
+    .no-results { text-align:center; padding:60px; color:#6e7681; }
+    .no-results .nr-icon { font-size:3rem; margin-bottom:12px; }
+
+    /* ── DETAIL PANEL ── */
+    .panel-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .panel-overlay.open { display: flex; }
+    .panel {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 680px;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 28px;
+      position: relative;
+    }
+    .panel h2 { color: #58a6ff; margin-bottom: 18px; font-size: 1rem; word-break: break-all; }
+    .panel-close {
+      position: absolute;
+      top: 14px; right: 18px;
+      background: none;
+      border: none;
+      color: #6e7681;
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+    .panel-close:hover { color: #f78166; }
+    .panel-row {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+      flex-wrap: wrap;
+    }
+    .panel-row .key { color: #6e7681; min-width: 120px; }
+    .panel-row .val { color: #e6edf3; word-break: break-all; }
+
+    /* ── FOOTER ── */
+    .footer { text-align:center; padding:28px; color:#3d444d; font-size:0.72rem; }
+    .footer a { color:#3d444d; }
+
+    /* ── RESPONSIVE ── */
+    @media(max-width:640px){
+      .container { padding: 12px; }
+      .header { padding: 12px 14px; }
+      .header h1 { font-size: 1rem; }
+      .controls input[type="text"] { width: 100%; }
+      tbody td { max-width: 110px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="header">
+  <div>
+    <h1>🔍 <span>Bug Bounty</span> Recon Tracker</h1>
+    <div class="sub">Unified Recon Dashboard — load your unified_recon.json</div>
+  </div>
+  <div class="header-right">
+    <span id="headerFile" style="font-size:0.78rem;color:#39d353;"></span>
+    <button class="btn btn-green" id="headerLoadBtn" style="display:none"
+            onclick="document.getElementById('fileInput').click()">📂 Load File</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- FILE LOADER -->
+  <div class="loader" id="loaderSection"
+       onclick="document.getElementById('fileInput').click()">
+    <div class="icon">📂</div>
+    <h2>Load Your Recon Data</h2>
+    <p>
+      Drop your <code>unified_recon.json</code> here, or click to choose a file.<br>
+      Generated by running <code>recon_merge.py</code>
+    </p>
+    <button class="btn btn-green"
+            onclick="event.stopPropagation(); document.getElementById('fileInput').click()">
+      Choose File
+    </button>
+    <p style="margin-top:14px;font-size:0.72rem;color:#3d444d;">
+      Supports: unified_recon.json (from recon_merge.py)
+    </p>
+  </div>
+  <input type="file" id="fileInput" accept=".json" />
+
+  <!-- DASHBOARD -->
+  <div class="dashboard" id="dashboard">
+
+    <!-- STATS -->
+    <div class="stats-grid">
+      <div class="stat-card s-total"><div class="num" id="sTotal">0</div><div class="lbl">Total Hosts</div></div>
+      <div class="stat-card s-live"> <div class="num" id="sLive">0</div> <div class="lbl">Live Hosts</div></div>
+      <div class="stat-card s-waf">  <div class="num" id="sWaf">0</div>  <div class="lbl">WAF Detected</div></div>
+      <div class="stat-card s-cdn">  <div class="num" id="sCdn">0</div>  <div class="lbl">CDN Detected</div></div>
+      <div class="stat-card s-ssl">  <div class="num" id="sSsl">0</div>  <div class="lbl">SSL/TLS Data</div></div>
+      <div class="stat-card s-tech"> <div class="num" id="sTech">0</div> <div class="lbl">Unique Tech</div></div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div class="controls">
+      <input type="text" id="searchQ" placeholder="🔍  Search host, IP, title, tech, WAF…" oninput="applyFilters()">
+      <select id="fStatus" onchange="applyFilters()">
+        <option value="">All Status</option>
+        <option value="2xx">2xx — OK</option>
+        <option value="3xx">3xx — Redirect</option>
+        <option value="4xx">4xx — Client Error</option>
+        <option value="5xx">5xx — Server Error</option>
+      </select>
+      <select id="fWaf" onchange="applyFilters()">
+        <option value="">All WAF</option>
+        <option value="yes">WAF Detected</option>
+        <option value="no">No WAF</option>
+      </select>
+      <select id="fCdn" onchange="applyFilters()">
+        <option value="">All CDN</option>
+        <option value="yes">CDN Detected</option>
+        <option value="no">No CDN</option>
+      </select>
+      <div class="spacer"></div>
+      <button class="btn btn-red"  onclick="resetFilters()">↩ Reset</button>
+      <button class="btn btn-lime" onclick="exportCSV()">⬇ CSV</button>
+      <button class="btn btn-blue" onclick="exportJSON()">⬇ JSON</button>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrap">
+      <div class="table-meta">
+        <span id="tableInfo">—</span>
+        <span class="filename" id="tableFile"></span>
+      </div>
+      <div class="scroll-x">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortBy('host')">Host <span class="sort-ic" id="si-host">↕</span></th>
+              <th onclick="sortBy('ip')">IP <span class="sort-ic" id="si-ip">↕</span></th>
+              <th onclick="sortBy('status')">Status <span class="sort-ic" id="si-status">↕</span></th>
+              <th onclick="sortBy('title')">Title <span class="sort-ic" id="si-title">↕</span></th>
+              <th>Tech Stack</th>
+              <th onclick="sortBy('waf')">WAF <span class="sort-ic" id="si-waf">↕</span></th>
+              <th onclick="sortBy('ssl')">SSL / TLS <span class="sort-ic" id="si-ssl">↕</span></th>
+              <th onclick="sortBy('cdn')">CDN <span class="sort-ic" id="si-cdn">↕</span></th>
+              <th onclick="sortBy('content_length')">Size <span class="sort-ic" id="si-content_length">↕</span></th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /dashboard -->
+</div><!-- /container -->
+
+<!-- DETAIL PANEL -->
+<div class="panel-overlay" id="overlay" onclick="closePanel(event)">
+  <div class="panel" id="panel">
+    <button class="panel-close" onclick="closePanel()">&times;</button>
+    <h2 id="panelTitle">—</h2>
+    <div id="panelBody"></div>
+  </div>
+</div>
+
+<div class="footer">
+  Bug Bounty Recon Tracker &mdash;
+  <a href="https://github.com/" target="_blank">GitHub</a>
+</div>
+
+<script>
+/* ───────── STATE ───────── */
+let allData      = [];
+let filtered     = [];
+let sortKey      = '';
+let sortDir      = 1;
+let currentFile  = '';
+
+/* ───────── FILE LOADING ───────── */
+const loaderEl = document.getElementById('loaderSection');
+
+loaderEl.addEventListener('dragover', e => {
+  e.preventDefault(); loaderEl.classList.add('drag-over');
+});
+loaderEl.addEventListener('dragleave', () => loaderEl.classList.remove('drag-over'));
+loaderEl.addEventListener('drop', e => {
+  e.preventDefault(); loaderEl.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const raw = JSON.parse(e.target.result);
+      allData = Array.isArray(raw) ? raw : [raw];
+      currentFile = file.name;
+      document.getElementById('loaderSection').style.display = 'none';
+      document.getElementById('headerLoadBtn').style.display = 'block';
+      document.getElementById('headerFile').textContent = '📄 ' + file.name;
+      document.getElementById('tableFile').textContent = '📄 ' + file.name;
+      document.getElementById('dashboard').classList.add('visible');
+      updateStats();
+      applyFilters();
+    } catch(err) {
+      alert('Could not parse JSON: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* ───────── STATS ───────── */
+function updateStats() {
+  const live = allData.filter(r => r.status && r.status >= 200 && r.status < 400).length;
+  const wafs = allData.filter(r => r.waf && r.waf !== 'None').length;
+  const cdns = allData.filter(r => r.cdn).length;
+  const ssls = allData.filter(r => r.ssl).length;
+  const tech = new Set(); allData.forEach(r => (r.tech||[]).forEach(t => tech.add(t)));
+
+  document.getElementById('sTotal').textContent = allData.length;
+  document.getElementById('sLive').textContent  = live;
+  document.getElementById('sWaf').textContent   = wafs;
+  document.getElementById('sCdn').textContent   = cdns;
+  document.getElementById('sSsl').textContent   = ssls;
+  document.getElementById('sTech').textContent  = tech.size;
+}
+
+/* ───────── FILTERS ───────── */
+function applyFilters() {
+  const q      = document.getElementById('searchQ').value.toLowerCase();
+  const fStat  = document.getElementById('fStatus').value;
+  const fWaf   = document.getElementById('fWaf').value;
+  const fCdn   = document.getElementById('fCdn').value;
+
+  filtered = allData.filter(r => {
+    if (q) {
+      const hay = [r.host, r.ip, r.title, r.waf, r.ssl, r.webserver,
+                   ...(r.tech||[])].filter(Boolean).join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (fStat) {
+      const s = r.status;
+      if (!s) return false;
+      if (fStat==='2xx' && !(s>=200&&s<300)) return false;
+      if (fStat==='3xx' && !(s>=300&&s<400)) return false;
+      if (fStat==='4xx' && !(s>=400&&s<500)) return false;
+      if (fStat==='5xx' && !(s>=500&&s<600)) return false;
+    }
+    if (fWaf==='yes' && !(r.waf && r.waf!=='None')) return false;
+    if (fWaf==='no'  &&  (r.waf && r.waf!=='None')) return false;
+    if (fCdn==='yes' && !r.cdn) return false;
+    if (fCdn==='no'  &&  r.cdn) return false;
+    return true;
+  });
+
+  if (sortKey) {
+    filtered.sort((a,b) => {
+      const av = a[sortKey] ?? '';
+      const bv = b[sortKey] ?? '';
+      return av < bv ? -sortDir : av > bv ? sortDir : 0;
+    });
+  }
+
+  renderTable();
+  document.getElementById('tableInfo').textContent =
+    `Showing ${filtered.length} of ${allData.length} hosts`;
+}
+
+/* ───────── SORT ───────── */
+function sortBy(key) {
+  sortDir = sortKey === key ? -sortDir : 1;
+  sortKey = key;
+  document.querySelectorAll('.sort-ic').forEach(el => {
+    el.textContent = '↕';
+    el.closest('th').classList.remove('sorted');
+  });
+  const ic = document.getElementById('si-' + key);
+  if (ic) { ic.textContent = sortDir===1?'↑':'↓'; ic.closest('th').classList.add('sorted'); }
+  applyFilters();
+}
+
+/* ───────── RENDER ───────── */
+function statusCls(s) {
+  if (!s) return 'b-nil';
+  if (s>=200&&s<300) return 'b-2xx';
+  if (s>=300&&s<400) return 'b-3xx';
+  if (s>=400&&s<500) return 'b-4xx';
+  if (s>=500&&s<600) return 'b-5xx';
+  return 'b-nil';
+}
+
+function fmtSize(b) {
+  if (!b) return '<span class="dim">—</span>';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(1) + ' MB';
+}
+
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                  .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function trunc(s, n) {
+  if (!s) return '';
+  return s.length > n ? s.slice(0,n)+'…' : s;
+}
+
+function renderTable() {
+  const tbody = document.getElementById('tbody');
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="10"><div class="no-results">
+      <div class="nr-icon">🔍</div><div>No hosts match your filters.</div>
+    </div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((r, i) => {
+    const tech = r.tech || [];
+    const techHTML = !tech.length
+      ? '<span class="dim">—</span>'
+      : tech.slice(0,3).map(t=>`<span class="badge tech-pill">${esc(t)}</span>`).join(' ')
+        + (tech.length>3 ? `<span class="tech-more"> +${tech.length-3}</span>` : '');
+
+    const wafHTML = (r.waf && r.waf!=='None')
+      ? `<span class="badge waf-badge">${esc(r.waf)}</span>`
+      : '<span class="dim">—</span>';
+
+    const sslHTML = r.ssl
+      ? `<span class="ssl-val">${esc(r.ssl)}</span>`
+      : '<span class="dim">—</span>';
+
+    const cdnHTML = r.cdn
+      ? `<span class="cdn-val">✓ ${r.cdn_name ? esc(r.cdn_name) : 'CDN'}</span>`
+      : '<span class="dim">—</span>';
+
+    const url = r.url || `https://${r.host}`;
+    const ipHTML = r.ip
+      ? `<span class="ip-cell">${esc(r.ip)}</span>`
+      : '<span class="dim">—</span>';
+    const titleHTML = r.title
+      ? `<span title="${esc(r.title)}">${esc(trunc(r.title,28))}</span>`
+      : '<span class="dim">—</span>';
+
+    return `<tr>
+      <td><a class="host-link" href="${esc(url)}" target="_blank" rel="noopener">${esc(r.host||'—')}</a></td>
+      <td>${ipHTML}</td>
+      <td><span class="badge ${statusCls(r.status)}">${r.status||'—'}</span></td>
+      <td>${titleHTML}</td>
+      <td><div class="tech-wrap">${techHTML}</div></td>
+      <td>${wafHTML}</td>
+      <td>${sslHTML}</td>
+      <td>${cdnHTML}</td>
+      <td>${fmtSize(r.content_length)}</td>
+      <td><button class="btn" style="padding:3px 10px;font-size:0.72rem;"
+            onclick="openPanel(${i})">View</button></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ───────── DETAIL PANEL ───────── */
+function openPanel(idx) {
+  const r = filtered[idx];
+  document.getElementById('panelTitle').textContent = r.host || '—';
+  const fields = [
+    ['URL',            r.url],
+    ['IP',             r.ip],
+    ['Status',         r.status],
+    ['Title',          r.title],
+    ['Tech Stack',     (r.tech||[]).join(', ') || '—'],
+    ['WAF',            r.waf || '—'],
+    ['WAF Vendor',     r.waf_manufacturer || '—'],
+    ['SSL / TLS',      r.ssl || '—'],
+    ['CDN',            r.cdn ? ('Yes' + (r.cdn_name ? ' — '+r.cdn_name : '')) : 'No'],
+    ['Web Server',     r.webserver || '—'],
+    ['Content Length', r.content_length ? r.content_length + ' bytes' : '—'],
+    ['Redirect',       r.redirect || '—'],
+  ];
+  document.getElementById('panelBody').innerHTML = fields.map(([k,v]) =>
+    `<div class="panel-row">
+       <span class="key">${esc(k)}</span>
+       <span class="val">${esc(v ?? '—')}</span>
+     </div>`
+  ).join('');
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closePanel(e) {
+  if (!e || e.target === document.getElementById('overlay')) {
+    document.getElementById('overlay').classList.remove('open');
+  }
+}
+
+/* ───────── RESET ───────── */
+function resetFilters() {
+  document.getElementById('searchQ').value   = '';
+  document.getElementById('fStatus').value   = '';
+  document.getElementById('fWaf').value      = '';
+  document.getElementById('fCdn').value      = '';
+  sortKey = ''; sortDir = 1;
+  document.querySelectorAll('.sort-ic').forEach(el => el.textContent='↕');
+  document.querySelectorAll('thead th').forEach(el => el.classList.remove('sorted'));
+  applyFilters();
+}
+
+/* ───────── EXPORT ───────── */
+function exportCSV() {
+  const cols = ['host','ip','status','title','tech','waf','ssl','cdn','cdn_name','content_length','webserver','redirect'];
+  const rows = [cols.join(',')];
+  filtered.forEach(r => {
+    rows.push(cols.map(c => {
+      let v = r[c];
+      if (Array.isArray(v)) v = v.join('; ');
+      if (v == null) v = '';
+      return `"${String(v).replace(/"/g,'""')}"`;
+    }).join(','));
+  });
+  dl('recon_export.csv', rows.join('\n'), 'text/csv');
+}
+
+function exportJSON() {
+  dl('recon_export.json', JSON.stringify(filtered, null, 2), 'application/json');
+}
+
+function dl(name, content, type) {
+  const a  = document.createElement('a');
+  a.href   = URL.createObjectURL(new Blob([content], {type}));
+  a.download = name;
+  a.click();
+}
+</script>
+</body>
+</html>
