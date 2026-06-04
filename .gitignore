@@ -1,28 +1,22 @@
-# Python
+# Python cache
 __pycache__/
 *.py[cod]
 *.pyo
-*.pyd
-.Python
-*.egg-info/
-dist/
-build/
-.eggs/
 
 # Virtual environments
 venv/
 env/
 .venv/
 
-# Output & recon data (sensitive)
+# Recon output files (sensitive — do not commit)
 *.json
 !example_*.json
 
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 
-# IDE
+# IDEs
 .vscode/
 .idea/
 *.swp
